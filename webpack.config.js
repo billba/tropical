@@ -24,7 +24,7 @@ var coreConfig = {
 };
 
 var chatConfig = {
-    entry: "./src/tropical.tsx",
+    entry: "./src/tropical.ts",
     output: {
         filename: "../public/tropical.js"
     }
