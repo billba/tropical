@@ -18,6 +18,9 @@ ws = new WebSocket('ws://localhost:8080/client');
 ws.onopen = () => {
     console.log("client connected");
     if (ws)
-        ws.onmessage = action => store.dispatch(JSON.parse(action.data));
+        ws.onmessage = action => store.dispatch({
+            type: 'pushAction',
+            action: JSON.parse(action.data)
+        });
 }
 

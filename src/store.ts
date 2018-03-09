@@ -2,15 +2,18 @@
 
 import { Reducer, AnyAction } from 'redux';
 
-export enum TopicActionType {
+export enum TelemetryActionType {
+    assignRootTopic = "assignRootTopic",
     initBegin = "init.begin",
     initEnd = "init.end",
+    onReceiveBegin = "onReceive.begin",
+    onReceiveEnd = "onReceive.end",
+    nextBegin = "next.begin",
+    nextEnd = "next.end",
 }
 
-interface TopicInstance {
+export interface TopicInstance {
     instanceName: string,
-    parentInstanceName: string,
-    className: string,
     topicName: string,
     children: string[],
 }
@@ -21,46 +24,89 @@ interface Activity {
 }
 
 export interface TelemetryAction extends AnyAction {
-    type: TopicActionType,
+    type: TelemetryActionType,
     activity: Activity,
     instance: TopicInstance,
 }
 
+type TropicalActions = TelemetryAction | {
+    type: 'pushAction',
+    action: TelemetryAction,
+} | {
+    type: 'popAction'
+}
+
+export interface TopicalState {
+    actions: TelemetryAction[],
+    action: undefined | TelemetryAction,
+    activity: undefined | Activity,
+    instances: {
+        [instanceName: string]: TopicInstance,
+    },
+    rootInstanceName: undefined | string,
+}
+
+export const topical = (
+    state: TopicalState = {
+        actions: [],
+        action: undefined,
+        activity: undefined,
+        instances: {},
+        rootInstanceName: undefined,
+    },
+    action: TropicalActions,
+): TopicalState => {
+    switch (action.type) {
+        case 'pushAction':
+            return {
+                ... state,
+                actions: [ ... state.actions, action.action ],
+            }
+        case 'popAction':
+            return state.actions.length === 0
+                ? state
+                : {
+                    ... topical(state, state.actions[0]),
+                    action: state.actions[0],
+                    actions: [ ... state.actions.slice(1)],
+                }
+        case TelemetryActionType.assignRootTopic:
+            return {
+                ... state,
+                activity: action.activity,
+                rootInstanceName: action.instance.instanceName,
+            }
+        case TelemetryActionType.initBegin:
+        case TelemetryActionType.initEnd:
+        case TelemetryActionType.onReceiveBegin:
+        case TelemetryActionType.onReceiveEnd:
+        case TelemetryActionType.nextBegin:
+        case TelemetryActionType.nextEnd:
+            return {
+                ... state,
+                activity: action.activity,
+                instances: {
+                    ... state.instances,
+                    [action.instance.instanceName]: action.instance,
+                }
+            }
+        default:
+            return state;
+    }
+}
+
 // export interface TopicalState {
-//     instances: {
-//         [instanceName: string]: TopicInstance;
-//     },
-//     rootInstanceName: undefined | string;
+//     actions: TelemetryAction[];
 // }
 
 // export const topical = (
 //     state = {
-//         instances: {},
-//         rootInstanceName: undefined,
-//     },
+//         actions: []
+//     } as TopicalState,
 //     action: TelemetryAction,
-// ) => {
-//     switch (action.type) {
-//         default:
-//             return {
-//                 instances: {},
-//                 rootInstanceName: undefined,
-//             }
-//     }
-// }
-
-export interface TopicalState {
-    actions: TelemetryAction[];
-}
-
-export const topical = (
-    state = {
-        actions: []
-    } as TopicalState,
-    action: TelemetryAction,
-) => ({
-    actions: [ action, ... state.actions ]
-})
+// ) => ({
+//     actions: [ action, ... state.actions ]
+// })
 
 export interface AppState {
     topical: TopicalState,
