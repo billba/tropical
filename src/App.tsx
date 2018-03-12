@@ -2,7 +2,12 @@ import * as React from 'react';
 import * as ReactDOM from 'react-dom';
 import { Provider, connect } from 'react-redux';
 
-import { AppStore, TelemetryAction, AppState, TopicalState, TopicInstance } from './store';
+import { AppStore, TelemetryAction, AppState, TopicalState, TopicInstance, TopicInstances } from './store';
+
+interface Activity {
+    type: string,
+    text: string,
+}
 
 export interface TropicalProps {
     store: AppStore;
@@ -13,34 +18,67 @@ export const App = (props: TropicalProps) =>
         <Topics/>
     </Provider>;
 
-const Instance = (props: TopicInstance) =>  
-    <div>
-        <p>Topic Name: { props.topicName }</p>   
-        <p>Instance Name: { props.instanceName }</p>
+const Instance = (props: {
+    activity: Activity,
+    action: TelemetryAction,
+    instance: TopicInstance,
+}) =>  
+    <div style={{ border: '1px black' }}>
+        { props.action.instance === props.instance &&
+            <div>
+                { props.activity.type === 'message'
+                    ? <p>Message: { props.activity.text }</p> 
+                    : <p>Non-Message Activity</p>
+                }
+                <p>Action: { props.action.type }</p>             
+            </div>
+        }
+        <p>Topic Name: { props.instance.topicName }</p>   
+        <p>Instance Name: { props.instance.instanceName }</p>
     </div>
 
-const Instances = (props: TopicalState) => {
-    let instanceName = props.rootInstanceName;
-    if (!instanceName)
-        return <p>No Root yet</p>;
-    
-    const instances: TopicInstance[] = [];
-
-    do {
-        console.log("an instance");
-        const instance: TopicInstance = props.instances[instanceName];
-        instances.push(instance);
-        instanceName = instance.children.length ? instance.children[0] : undefined;
-    } while (instanceName);
-
-    console.log("instances", instances);
-
+const InstanceTree = (props: {
+    activity: Activity,
+    action: TelemetryAction,
+    title: string,
+    instanceTree: TopicInstance[],
+}) => {
     return (
-        <div>{
-            instances.map(instance => <Instance { ... instance } />)
-        }</div>
+        <div>
+            <h3>{ props.title }</h3>
+            {
+                props.instanceTree.map(instance => <Instance activity={ props.activity } action={ props.action } instance={ instance } />)
+            }
+        </div>
     );
 }
+
+const instanceTree = (
+    root: TopicInstance,
+    instances: TopicInstances,
+) => {
+    const instanceTree: TopicInstance[] = [];
+    let instance: undefined | TopicInstance = root;
+    
+    do {
+        instanceTree.push(instance);
+        instance = instance.children.length ? instances[instance!.children[0]] : undefined;
+    } while (instance);
+
+    return instanceTree;
+}
+
+const Instances = (props: {
+    activity: Activity,
+    action: TelemetryAction,
+    root: undefined | TopicInstance[],
+    other: TopicInstance[][],
+}) => 
+    <div>
+        { props.root ? <InstanceTree activity={ props.activity } action={ props.action } title="Root" instanceTree={ props.root }/> : <p>No Root yet</p>}
+        { props.other.map(otherRoot => <InstanceTree activity={ props.activity } action={ props.action } title="Other" instanceTree={ otherRoot }/>) }
+    </div>;
+
 
 interface QueueProps {
     action: undefined | TelemetryAction,
@@ -50,7 +88,6 @@ interface QueueProps {
 
 const Queue = (props: QueueProps) => 
     <div>
-        <p>Current Action { props.action ? props.action.type : "n/a" }</p>
         <p>{ props.count
                 ? (<span><a href="#noop" onClick={ props.onNext }>next</a> of { props.count }</span>)
                 : <span>(no more actions right now)</span>
@@ -61,12 +98,34 @@ const _Topics = (
     props: TopicalState & {
         onNext: () => void,
     }
-) =>
-    <div>
-        <Queue action={ props.action } count={ props.actions.length } onNext={ props.onNext }/>
-        <p>Message: { props.activity ? props.activity.text : 'n/a'}</p>
-        <Instances { ... props }/>
-    </div>;
+) => {
+    const instanceNames = Object
+        .keys(props.instances);
+
+    const orphans = instanceNames
+        .filter(instanceName => instanceNames
+            .every(_instanceName => _instanceName === instanceName ||
+                props.instances[_instanceName].children.indexOf(instanceName) === -1
+            )
+        )
+        .map(orphan => props.instances[orphan]);
+
+    const instanceTrees = orphans
+        .map(orphan => instanceTree(orphan, props.instances));
+
+    const root = instanceTrees.find(instanceTree => instanceTree[0].instanceName === props.rootInstanceName);
+    const others = instanceTrees.filter(instanceTree => instanceTree !== root);
+
+    return (
+        <div>
+            <Queue action={ props.action } count={ props.actions.length } onNext={ props.onNext }/>
+            { root || others.length
+                ? <Instances activity={ props.activity! } action={ props.action! } root={ root } other={ others }/>
+                : undefined
+            }
+        </div>
+    );
+}
 
 export const Topics = connect(
     (state: AppState) => ({
@@ -76,3 +135,4 @@ export const Topics = connect(
         onNext: () => ({ type: 'popAction' }),
     }
 )(_Topics);
+

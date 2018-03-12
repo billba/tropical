@@ -4,12 +4,16 @@ import { Reducer, AnyAction } from 'redux';
 
 export enum TelemetryActionType {
     assignRootTopic = "assignRootTopic",
+    endOfTurn = "endOfTurn",
+    deleteInstance = "deleteInstance",
     initBegin = "init.begin",
     initEnd = "init.end",
     onReceiveBegin = "onReceive.begin",
     onReceiveEnd = "onReceive.end",
     nextBegin = "next.begin",
     nextEnd = "next.end",
+    onChildReturnBegin = "onChildReturn.begin",
+    onChildReturnEnd = "onChildReturn.end",
 }
 
 export interface TopicInstance {
@@ -36,15 +40,55 @@ type TropicalActions = TelemetryAction | {
     type: 'popAction'
 }
 
+export interface TopicInstances {
+    [instanceName: string]: TopicInstance,
+}
+
 export interface TopicalState {
     actions: TelemetryAction[],
     action: undefined | TelemetryAction,
     activity: undefined | Activity,
-    instances: {
-        [instanceName: string]: TopicInstance,
-    },
+    instances: TopicInstances,
     rootInstanceName: undefined | string,
 }
+
+export const getOrphans = (
+    root: string,
+    instances: TopicInstances,
+) => {
+    const orphans = new Set(Object.keys(instances));
+
+    const deorphanize = (instanceName: string) => {
+        orphans.delete(instanceName);
+
+        for (let child of instances[instanceName].children)
+            deorphanize(child);
+    }
+
+    deorphanize(root);
+
+    return orphans;
+}
+
+const gcInstances = (
+    root: string,
+    instances: TopicInstances,
+) => {
+    for (let orphan of getOrphans(root, instances)) {
+        console.log("GC ", orphan);
+        delete instances[orphan];
+    }
+
+    return instances;
+}
+
+const updateInstance = (
+    state: TopicalState,
+    instance: TopicInstance,
+) => ({
+    ... state.instances,
+    [instance.instanceName]: instance,
+});
 
 export const topical = (
     state: TopicalState = {
@@ -70,11 +114,20 @@ export const topical = (
                     action: state.actions[0],
                     actions: [ ... state.actions.slice(1)],
                 }
+        case TelemetryActionType.endOfTurn:
+            return {
+                ... state,
+                activity: action.activity,
+                action: action.action,
+                instances: gcInstances(state.rootInstanceName!, updateInstance(state, action.instance)),
+            }
         case TelemetryActionType.assignRootTopic:
             return {
                 ... state,
                 activity: action.activity,
+                action: action.action,
                 rootInstanceName: action.instance.instanceName,
+                instances: updateInstance(state, action.instance)
             }
         case TelemetryActionType.initBegin:
         case TelemetryActionType.initEnd:
@@ -82,31 +135,19 @@ export const topical = (
         case TelemetryActionType.onReceiveEnd:
         case TelemetryActionType.nextBegin:
         case TelemetryActionType.nextEnd:
+        case TelemetryActionType.onChildReturnBegin:
+        case TelemetryActionType.onChildReturnEnd:
             return {
                 ... state,
                 activity: action.activity,
-                instances: {
-                    ... state.instances,
-                    [action.instance.instanceName]: action.instance,
-                }
+                action: action.action,
+                instances: updateInstance(state, action.instance)
             }
         default:
+            console.log("unknown actiom", action);
             return state;
     }
 }
-
-// export interface TopicalState {
-//     actions: TelemetryAction[];
-// }
-
-// export const topical = (
-//     state = {
-//         actions: []
-//     } as TopicalState,
-//     action: TelemetryAction,
-// ) => ({
-//     actions: [ action, ... state.actions ]
-// })
 
 export interface AppState {
     topical: TopicalState,
