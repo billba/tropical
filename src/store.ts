@@ -3,6 +3,7 @@
 import { Reducer, AnyAction } from 'redux';
 
 export enum TelemetryActionType {
+    newConversation = "newConversation",
     assignRootTopic = "assignRootTopic",
     endOfTurn = "endOfTurn",
     deleteInstance = "deleteInstance",

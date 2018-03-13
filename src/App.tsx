@@ -23,7 +23,7 @@ const Instance = (props: {
     action: TelemetryAction,
     instance: TopicInstance,
 }) =>  
-    <div style={{ border: '1px black' }}>
+    <div style={{ border: 'solid', width: '250px', maxWidth: '250px' }}>
         { props.action.instance === props.instance &&
             <div>
                 { props.activity.type === 'message'
@@ -33,8 +33,7 @@ const Instance = (props: {
                 <p>Action: { props.action.type }</p>             
             </div>
         }
-        <p>Topic Name: { props.instance.topicName }</p>   
-        <p>Instance Name: { props.instance.instanceName }</p>
+        <p><b>{ props.instance.topicName }</b></p>   
     </div>
 
 const InstanceTree = (props: {
@@ -44,7 +43,7 @@ const InstanceTree = (props: {
     instanceTree: TopicInstance[],
 }) => {
     return (
-        <div>
+        <div style={{ float: 'left' }}>
             <h3>{ props.title }</h3>
             {
                 props.instanceTree.map(instance => <Instance activity={ props.activity } action={ props.action } instance={ instance } />)
@@ -75,8 +74,10 @@ const Instances = (props: {
     other: TopicInstance[][],
 }) => 
     <div>
+        <div/>
         { props.root ? <InstanceTree activity={ props.activity } action={ props.action } title="Root" instanceTree={ props.root }/> : <p>No Root yet</p>}
         { props.other.map(otherRoot => <InstanceTree activity={ props.activity } action={ props.action } title="Other" instanceTree={ otherRoot }/>) }
+        <div style={{ float: 'none' }}/>
     </div>;
 
 
